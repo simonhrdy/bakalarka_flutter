@@ -1,0 +1,593 @@
+import 'dart:convert';
+
+import 'package:auto_route/auto_route.dart';
+import 'package:collection/collection.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:intl/intl.dart';
+import 'package:sportmatter/config/extensions/extensions.dart';
+import 'package:sportmatter/config/themes/routes/app_router.gr.dart';
+import 'package:sportmatter/data/models/match/match_analysis_model.dart';
+import 'package:sportmatter/data/models/match/match_betting_model.dart';
+import 'package:sportmatter/data/models/match/match_model.dart';
+import 'package:sportmatter/data/models/player/player_model.dart';
+import 'package:sportmatter/data/models/team/team_model.dart';
+import 'package:sportmatter/data/models/user/user_model.dart';
+import 'package:sportmatter/data/params/match/match_params.dart';
+import 'package:sportmatter/data/params/player/player_action_params.dart';
+import 'package:sportmatter/data/resources/data_state.dart';
+import 'package:sportmatter/hooks/repository/use_api_repository.dart';
+import 'package:sportmatter/l10n/l10n.dart';
+import 'package:sportmatter/widgets/button/button.dart';
+import 'package:sportmatter/widgets/form/form_builder.dart';
+import 'package:sportmatter/widgets/form/line_up_selector.dart';
+import 'package:sportmatter/widgets/form/match_date_and_round_fields.dart';
+import 'package:sportmatter/widgets/form/match_status_and_supervisor_fields.dart';
+import 'package:sportmatter/widgets/form/player_action_inputs.dart';
+import 'package:sportmatter/widgets/form/text_field.dart';
+import 'package:sportmatter/widgets/responsive/responsive_row_column.dart';
+
+class FootballMatchFormScreen extends HookWidget {
+  const FootballMatchFormScreen({
+    required this.match,
+    required this.teams,
+    required this.users,
+    this.betting,
+    this.analysis,
+    super.key,
+  });
+
+  final MatchModel match;
+  final List<TeamModel> teams;
+  final List<UserModel> users;
+  final MatchBettingModel? betting;
+  final MatchAnalysisModel? analysis;
+
+  @override
+  Widget build(BuildContext context) {
+    final repository = useApiRepository();
+    final isLoading = useState(true);
+
+    final focusNodes =
+    useMemoized(() => List.generate(10, (_) => FocusNode()), []);
+    final dateTimeController = useTextEditingController();
+    final roundController =
+    useTextEditingController(text: match.lap?.toString() ?? '');
+    final status = useState<int>(match.status ?? 0);
+
+    final team1 = useState<TeamModel?>(
+      teams.firstWhereOrNull((t) => t.id == match.homeTeamId),);
+    final team2 = useState<TeamModel?>(
+      teams.firstWhereOrNull((t) => t.id == match.awayTeamId),);
+    final supervisor = useState<UserModel?>(
+      users.firstWhereOrNull((u) => u.id == match.supervisor),);
+
+    final goals1 = useTextEditingController(
+      text: match.parametrs?['count_of_goals_home_team'] as String? ??
+          '',);
+    final offside1 = useTextEditingController(
+      text: match.parametrs?['number_of_offside_home_team'] as String? ??
+          '',);
+    final shotsOnGoal1 = useTextEditingController(
+      text: match.parametrs?['number_of_shots_on_goal_home_team']
+      as String? ??
+          '',);
+    final numberOfShots1 = useTextEditingController(
+      text: match.parametrs?['number_of_shots_home_team'] as String? ??
+          '',);
+    final corner1 = useTextEditingController(
+      text: match.parametrs?['number_of_corner_home_team']
+      as String? ??
+          '',);
+
+    final holdingBall1 = useTextEditingController(text: match.parametrs?['holding_the_ball_home_team']
+    as String? ?? '',
+    );
+
+    final fouls1 = useTextEditingController(text: match.parametrs?['number_of_fouls_home_team']
+    as String? ?? '',
+    );
+
+    final redCards1 = useTextEditingController(text: match.parametrs?['number_of_red_cards_home_team']
+    as String? ?? '',
+    );
+
+    final yelllowCards1 = useTextEditingController(text: match.parametrs?['number_of_yellow_cards_home_team']
+    as String? ?? '',
+    );
+
+    final goals2 = useTextEditingController(
+        text: match.parametrs?['count_of_goals_away_team'] as String? ??
+            '');
+    final offside2 = useTextEditingController(
+      text: match.parametrs?['number_of_offside_away_team'] as String? ??
+          '',);
+    final shotsOnGoal2 = useTextEditingController(
+        text: match.parametrs?['number_of_shots_on_goal_away_team']
+        as String? ??
+            '');
+    final numberOfShots2 = useTextEditingController(
+        text: match.parametrs?['number_of_shots_away_team'] as String? ??
+            '');
+    final corner2 = useTextEditingController(
+      text: match.parametrs?['number_of_corner_away_team']
+      as String? ??
+          '',);
+
+    final holdingBall2 = useTextEditingController(text: match.parametrs?['holding_the_ball_away_team']
+    as String? ?? '',
+    );
+
+    final fouls2 = useTextEditingController(text: match.parametrs?['number_of_fouls_away_team']
+    as String? ?? '',
+    );
+
+    final redCards2 = useTextEditingController(text: match.parametrs?['number_of_red_cards_away_team']
+    as String? ?? '',
+    );
+
+    final yelllowCards2 = useTextEditingController(text: match.parametrs?['number_of_yellow_cards_away_team']
+    as String? ?? '',
+    );
+
+    final bettingTipsController =
+    useTextEditingController(text: betting?.content ?? '');
+    final matchAnalysisController =
+    useTextEditingController(text: analysis?.content ?? '');
+
+    final allPlayersTeam1 = useState<List<PlayerModel>>([]);
+    final allPlayersTeam2 = useState<List<PlayerModel>>([]);
+    final lineTeam1 = useState<List<PlayerModel>>([]);
+    final reservesTeam1 = useState<List<PlayerModel>>([]);
+    final lineTeam2 = useState<List<PlayerModel>>([]);
+    final reservesTeam2 = useState<List<PlayerModel>>([]);
+
+    final actionsHome = useState<List<PlayerAction>>([PlayerAction()]);
+    final actionsAway = useState<List<PlayerAction>>([PlayerAction()]);
+
+    final parsedDate = match.date is String
+        ? DateTime.tryParse(match.date as String)
+        : match.date;
+
+    if (parsedDate != null) {
+      dateTimeController.text =
+          DateFormat('yyyy-MM-dd HH:mm').format(parsedDate);
+    }
+
+    useEffect(() {
+      () async {
+        if (team1.value != null) {
+          final res = await repository.getPlayersTeam(team1.value!.id);
+          if (res is DataSuccess) allPlayersTeam1.value = res.data!;
+        }
+
+        if (team2.value != null) {
+          final res = await repository.getPlayersTeam(team2.value!.id);
+          if (res is DataSuccess) allPlayersTeam2.value = res.data!;
+        }
+
+        final resLineup = await repository.getLineup(match.id);
+        if (resLineup is DataSuccess) {
+          final lineups = resLineup.data!;
+          final homeId = match.homeTeamId;
+          final awayId = match.awayTeamId;
+
+          lineTeam1.value = lineups
+              .where((l) => l.idTeam == homeId && l.is_starter)
+              .map((l) => PlayerModel(
+              id: l.idPlayer, name: l.firstName!, surname: l.lastName))
+              .toList();
+          reservesTeam1.value = lineups
+              .where((l) => l.idTeam == homeId && !l.is_starter)
+              .map((l) => PlayerModel(
+              id: l.idPlayer, name: l.firstName!, surname: l.lastName))
+              .toList();
+          lineTeam2.value = lineups
+              .where((l) => l.idTeam == awayId && l.is_starter)
+              .map((l) => PlayerModel(
+              id: l.idPlayer, name: l.firstName!, surname: l.lastName))
+              .toList();
+          reservesTeam2.value = lineups
+              .where((l) => l.idTeam == awayId && !l.is_starter)
+              .map((l) => PlayerModel(
+              id: l.idPlayer, name: l.firstName!, surname: l.lastName))
+              .toList();
+        }
+
+        final parsedActions = match.parametrs?['actions'];
+        if (parsedActions != null) {
+          final decoded = parsedActions is String
+              ? jsonDecode(parsedActions)
+              : parsedActions;
+          if (decoded is List) {
+            final home = <PlayerAction>[];
+            final away = <PlayerAction>[];
+            for (final a in decoded) {
+              if (a is Map<String, dynamic>) {
+                final action = PlayerAction(
+                  playerId: a['id'] as int?,
+                  playerName: a['name'] as String?,
+                  type: a['type'] as int?,
+                  minute: a['minute'] as int?,
+                );
+                if (a['team'] == 'home') home.add(action);
+                if (a['team'] == 'away') away.add(action);
+              }
+            }
+            actionsHome.value = home.isEmpty ? [PlayerAction()] : home;
+            actionsAway.value = away.isEmpty ? [PlayerAction()] : away;
+          }
+        }
+
+        isLoading.value = false;
+      }();
+      return null;
+    }, [team1.value, team2.value]);
+
+    if (isLoading.value) {
+      return const Center(
+          child: CircularProgressIndicator(color: Colors.white));
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: FormBuilder(
+        focusNodes: focusNodes,
+        builder: (context, validate) {
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                MatchDateAndRoundFields(
+                  dateTimeController: dateTimeController,
+                  roundController: roundController,
+                ),
+                const SizedBox(height: 35),
+                MatchStatusAndSupervisorFields(
+                  status: status,
+                  supervisor: supervisor,
+                  users: users,
+                ),
+                const SizedBox(height: 24),
+                Text(context.l10n.bettingTips,
+                    style: const TextStyle(color: Colors.white)),
+                const SizedBox(height: 10),
+                FormTextField(
+                  controller: bettingTipsController,
+                  hintText: context.l10n.bettingTipsHint,
+                  maxLines: 6,
+                ),
+                const SizedBox(height: 24),
+                Text(context.l10n.matchAnalysis,
+                    style: const TextStyle(color: Colors.white)),
+                const SizedBox(height: 10),
+                FormTextField(
+                  controller: matchAnalysisController,
+                  hintText: context.l10n.matchAnalysisHint,
+                  maxLines: 6,
+                ),
+                const SizedBox(height: 24),
+                ResponsiveRowOrColumn(
+                  spacing: 16,
+                  children: [
+                    Column(
+                      children: [
+                        Text(context.l10n.team1,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 10),
+                        Text(team1.value?.name ?? '', style: context.textTheme.h1),
+                        const SizedBox(height: 25),
+                        Text(context.l10n.football_goals_team1,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 10),
+                        FormTextField(
+                            controller: goals1,
+                            hintText: context.l10n.football_goals_team1),
+                        const SizedBox(height: 15),
+                        Text(context.l10n.football_holding_team1,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 10),
+                        FormTextField(
+                            controller: holdingBall1,
+                            hintText: context.l10n.football_holding_team1),
+                        const SizedBox(height: 15),
+                        Text(context.l10n.football_shots_on_goal_team1,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 10),
+                        FormTextField(
+                            controller: shotsOnGoal1,
+                            hintText: context.l10n.football_shots_on_goal_team1),
+                        const SizedBox(height: 15),
+                        Text(context.l10n.football_shots_team1,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 10),
+                        FormTextField(
+                            controller: numberOfShots1,
+                            hintText: context.l10n.football_shots_team1),
+                        const SizedBox(height: 15),
+                        Text(context.l10n.football_corners_team1,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 10),
+                        FormTextField(
+                            controller: corner1,
+                            hintText: context.l10n.football_corners_team1),
+                        const SizedBox(height: 15),
+                        Text(context.l10n.football_offsides_team1,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 10),
+                        FormTextField(
+                            controller: offside1,
+                            hintText: context.l10n.football_offsides_team1),
+                        const SizedBox(height: 15),
+                        Text(context.l10n.football_fouls_team1,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 10),
+                        FormTextField(
+                            controller: fouls1,
+                            hintText: context.l10n.football_fouls_team1),
+                        const SizedBox(height: 15),
+                        Text(context.l10n.football_yellow_cards_team1,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 10),
+                        FormTextField(
+                            controller: yelllowCards1,
+                            hintText: context.l10n.football_yellow_cards_team1),
+                        const SizedBox(height: 15),
+                        Text(context.l10n.football_red_cards_team1,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 10),
+                        FormTextField(
+                            controller: redCards1,
+                            hintText: context.l10n.football_red_cards_team1),
+                      ],
+                    ),
+                    Column(
+                      children: [
+                        Text(context.l10n.team2,
+                            style: const TextStyle(
+                                color: Colors.white, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 10),
+                        Text(team2.value?.name ?? '', style: context.textTheme.h1),
+                        const SizedBox(height: 25),
+                        Text(context.l10n.football_goals_team2,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 10),
+                        FormTextField(
+                            controller: goals2,
+                            hintText: context.l10n.football_goals_team2),
+                        const SizedBox(height: 15),
+                        Text(context.l10n.football_holding_team2,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 10),
+                        FormTextField(
+                            controller: holdingBall2,
+                            hintText: context.l10n.football_holding_team2),
+                        const SizedBox(height: 15),
+                        Text(context.l10n.football_shots_on_goal_team2,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 10),
+                        FormTextField(
+                            controller: shotsOnGoal2,
+                            hintText: context.l10n.football_shots_on_goal_team2),
+                        const SizedBox(height: 15),
+                        Text(context.l10n.football_shots_team2,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 10),
+                        FormTextField(
+                            controller: numberOfShots2,
+                            hintText: context.l10n.football_shots_team2),
+                        const SizedBox(height: 15),
+                        Text(context.l10n.football_corners_team2,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 10),
+                        FormTextField(
+                            controller: corner2,
+                            hintText: context.l10n.football_corners_team2),
+                        const SizedBox(height: 15),
+                        Text(context.l10n.football_offsides_team2,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 10),
+                        FormTextField(
+                            controller: offside2,
+                            hintText: context.l10n.football_offsides_team2),
+                        const SizedBox(height: 15),
+                        Text(context.l10n.football_fouls_team2,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 10),
+                        FormTextField(
+                            controller: fouls2,
+                            hintText: context.l10n.football_fouls_team2),
+                        const SizedBox(height: 15),
+                        Text(context.l10n.football_yellow_cards_team2,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 10),
+                        FormTextField(
+                            controller: yelllowCards2,
+                            hintText: context.l10n.football_yellow_cards_team2),
+                        const SizedBox(height: 15),
+                        Text(context.l10n.football_red_cards_team2,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 10),
+                        FormTextField(
+                            controller: redCards2,
+                            hintText: context.l10n.football_red_cards_team2),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                ...[
+                  [context.l10n.form_line_up, lineTeam1, lineTeam2],
+                  [context.l10n.form_line_up_bench_, reservesTeam1, reservesTeam2],
+                ].map((entry) {
+                  final label = entry[0] as String;
+                  final home = entry[1] as ValueNotifier<List<PlayerModel>>;
+                  final away = entry[2] as ValueNotifier<List<PlayerModel>>;
+
+                  return LineupSelector(
+                    label: label,
+                    playersTeam1: allPlayersTeam1.value,
+                    playersTeam2: allPlayersTeam2.value,
+                    selectedTeam1: home,
+                    selectedTeam2: away,
+                  );
+                }),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 32),
+                    Text(
+                      context.l10n.action_headline_home_team,
+                      style: const TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    PlayerActionInputs(
+                      actionsList: actionsHome,
+                      playerList: allPlayersTeam1.value,
+                      team: 'home',
+                      actionTypeItems: [
+                        DropdownMenuItem(value: 1, child: Text(context.l10n.actions_goal)),
+                        DropdownMenuItem(
+                            value: 2, child: Text(context.l10n.action_yellow_card)),
+                        DropdownMenuItem(
+                            value: 3, child: Text(context.l10n.action_red_card)),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      context.l10n.action_headline_away_team,
+                      style: const TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    PlayerActionInputs(
+                      actionsList: actionsAway,
+                      playerList: allPlayersTeam2.value,
+                      team: 'away',
+                      actionTypeItems: [
+                         DropdownMenuItem(value: 1, child: Text(context.l10n.actions_goal)),
+                         DropdownMenuItem(
+                            value: 2, child: Text(context.l10n.action_yellow_card)),
+                        DropdownMenuItem(
+                            value: 3, child: Text(context.l10n.action_red_card)),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                PrimaryButton(
+                  text: 'Uložit změny',
+                  onPressed: () async {
+                    if (dateTimeController.text.isEmpty ||
+                        team1.value == null ||
+                        team2.value == null ||
+                        supervisor.value == null ||
+                        team1.value!.id == team2.value!.id) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                            content: Text(context.l10n.form_empty_fields_error)),
+                      );
+                      return;
+                    }
+
+                    final statistics = {
+                      'count_of_goals_home_team': goals1.text,
+                      'number_of_offside_home_team': offside1.text,
+                      'number_of_shots_on_goal_home_team': shotsOnGoal1.text,
+                      'number_of_shots_home_team': numberOfShots1.text,
+                      'number_of_corner_home_team': corner1.text,
+                      'holding_the_ball_home_team': holdingBall1.text,
+                      'number_of_fouls_home_team': fouls1.text,
+                      'number_of_red_cards_home_team': redCards1.text,
+                      'number_of_yellow_cards_home_team': yelllowCards1.text,
+                      'count_of_goals_away_team': goals2.text,
+                      'number_of_offside_away_team': offside2.text,
+                      'number_of_shots_on_goal_away_team': shotsOnGoal2.text,
+                      'number_of_shots_away_team': numberOfShots2.text,
+                      'number_of_corner_away_team': corner2.text,
+                      'holding_the_ball_away_team': holdingBall2.text,
+                      'number_of_fouls_away_team': fouls2.text,
+                      'number_of_red_cards_away_team': redCards2.text,
+                      'number_of_yellow_cards_away_team': yelllowCards2.text,
+                    };
+
+                    final allActions = [
+                      ...actionsHome.value
+                          .where(
+                              (a) => a.playerName?.trim().isNotEmpty ?? false)
+                          .map((a) => {
+                        'id': a.playerId,
+                        'name': a.playerName!,
+                        'team': 'home',
+                        'type': a.type ?? 1,
+                        'minute': a.minute ?? 0,
+                      }),
+                      ...actionsAway.value
+                          .where(
+                              (a) => a.playerName?.trim().isNotEmpty ?? false)
+                          .map((a) => {
+                        'id': a.playerId,
+                        'name': a.playerName!,
+                        'team': 'away',
+                        'type': a.type ?? 1,
+                        'minute': a.minute ?? 0,
+                      }),
+                    ];
+
+                    statistics['actions'] = jsonEncode(allActions);
+
+                    final lineUpHome = [
+                      ...lineTeam1.value
+                          .map((p) => {'id': p.id, 'is_starter': 1}),
+                      ...reservesTeam1.value
+                          .map((p) => {'id': p.id, 'is_starter': 0}),
+                    ];
+
+                    final lineUpAway = [
+                      ...lineTeam2.value
+                          .map((p) => {'id': p.id, 'is_starter': 1}),
+                      ...reservesTeam2.value
+                          .map((p) => {'id': p.id, 'is_starter': 0}),
+                    ];
+
+                    final params = MatchParams(
+                      dateOfGame: dateTimeController.text,
+                      lap: roundController.text.isEmpty
+                          ? null
+                          : roundController.text,
+                      status: status.value,
+                      supervisorId: supervisor.value?.id,
+                      homeTeamId: team1.value!.id,
+                      awayTeamId: team2.value!.id,
+                      leagueId: match.leagueId,
+                      statistics: statistics,
+                      lineUpAway: lineUpAway,
+                      lineUpHome: lineUpHome,
+                      betting_tips: bettingTipsController.text,
+                      match_analysis: matchAnalysisController.text,
+                    );
+
+                    final result =
+                    await repository.updateGame(match.id, params);
+
+                    if (result is DataSuccess) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                         SnackBar(content: Text(context.l10n.hockey_success)),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                         SnackBar(
+                          content: Text(context.l10n.hockey_error)),
+                      );
+                    }
+
+                    await context.router.replace(const HomeRoute());
+                  },
+                  isDisabled: false,
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
