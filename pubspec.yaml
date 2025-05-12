@@ -43,7 +43,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   mocktail: 1.0.4
-  retrofit_generator: 9.1.7
+  retrofit_generator: 9.2.0
   very_good_analysis: 6.0.0
 
 flutter_gen:
